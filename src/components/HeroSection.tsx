@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, Users, ArrowRight } from "lucide-react";
 
@@ -22,7 +23,7 @@ const HeroSection = () => {
               Start Analysis
               <ArrowRight className="ml-2 h-6 w-6" />
             </Button>
-            <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/20 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform hover:scale-105 transition-all duration-200">
+            <Button size="lg" className="bg-blue-600 text-white hover:bg-blue-700 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform hover:scale-105 transition-all duration-200">
               View Governance
             </Button>
           </div>
