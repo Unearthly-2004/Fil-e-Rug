@@ -30,9 +30,6 @@ const Navigation = () => {
             <Button variant="outline" className="hidden sm:flex">
               Connect Wallet
             </Button>
-            <Button className="crypto-gradient text-white">
-              Get Started
-            </Button>
           </div>
         </div>
       </div>

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, Users, ArrowRight } from "lucide-react";
 
@@ -18,12 +17,12 @@ const HeroSection = () => {
             from fraudulent projects across the blockchain ecosystem.
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100">
+          <div className="flex flex-col sm:flex-row gap-6 justify-center mb-12">
+            <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform hover:scale-105 transition-all duration-200">
               Start Analysis
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="ml-2 h-6 w-6" />
             </Button>
-            <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+            <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/20 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform hover:scale-105 transition-all duration-200">
               View Governance
             </Button>
           </div>
