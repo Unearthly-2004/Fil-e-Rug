@@ -1,4 +1,5 @@
 
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Zap, Database, CheckCircle, ArrowRight } from "lucide-react";
@@ -59,7 +60,7 @@ const BlockchainIntegration = () => {
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Processing Speed</span>
-                    <Badge variant="outline">< 1 second</Badge>
+                    <Badge variant="outline">&lt; 1 second</Badge>
                   </div>
                 </div>
               </div>
