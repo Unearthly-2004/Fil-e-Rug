@@ -1,8 +1,53 @@
-
 import { Button } from "@/components/ui/button";
-import { Shield, BarChart3, Users } from "lucide-react";
+import { Shield, BarChart3, Users, Wallet, AlertTriangle } from "lucide-react";
+import { useWallet } from "@/hooks/useWallet";
+import { useState } from "react";
 
 const Navigation = () => {
+  const { 
+    address, 
+    connect, 
+    disconnect, 
+    switchToCalibnet, 
+    isConnecting, 
+    isConnected, 
+    isCalibnet 
+  } = useWallet();
+
+  const [isNavigating, setIsNavigating] = useState<string | null>(null);
+
+  const handleNavigation = (section: string) => {
+    setIsNavigating(section);
+    
+    // Add visual effect and scroll
+    setTimeout(() => {
+      setIsNavigating(null);
+      
+      let targetSection: HTMLElement | null = null;
+      
+      switch (section) {
+        case 'governance':
+          targetSection = document.getElementById('governance-voting');
+          break;
+        case 'analytics':
+          targetSection = document.getElementById('detection-factors');
+          break;
+        case 'dashboard':
+          targetSection = document.getElementById('detection-factors');
+          break;
+        default:
+          break;
+      }
+      
+      if (targetSection) {
+        targetSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 300);
+  };
+
   return (
     <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,21 +60,78 @@ const Navigation = () => {
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#dashboard" className="text-gray-600 hover:text-purple-600 font-medium">
+            <button 
+              onClick={() => handleNavigation('dashboard')}
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
+                isNavigating === 'dashboard' ? 'text-purple-600 scale-95' : ''
+              }`}
+            >
               Dashboard
-            </a>
-            <a href="#governance" className="text-gray-600 hover:text-purple-600 font-medium">
+            </button>
+            <button 
+              onClick={() => handleNavigation('governance')}
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
+                isNavigating === 'governance' ? 'text-purple-600 scale-95' : ''
+              }`}
+            >
               Governance
-            </a>
-            <a href="#analytics" className="text-gray-600 hover:text-purple-600 font-medium">
+            </button>
+            <button 
+              onClick={() => handleNavigation('analytics')}
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
+                isNavigating === 'analytics' ? 'text-purple-600 scale-95' : ''
+              }`}
+            >
               Analytics
-            </a>
+            </button>
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button variant="outline" className="hidden sm:flex">
-              Connect Wallet
-            </Button>
+            {/* Network Status */}
+            {isConnected && !isCalibnet && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={switchToCalibnet}
+                className="text-orange-600 border-orange-200 hover:bg-orange-50"
+              >
+                <AlertTriangle className="h-4 w-4 mr-1" />
+                Switch to Calibnet
+              </Button>
+            )}
+            
+            {isConnected && isCalibnet && (
+              <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                Calibnet
+              </div>
+            )}
+
+            {/* Wallet Connection */}
+            {isConnected ? (
+              <div className="flex items-center space-x-2">
+                <div className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnect()}
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={connect}
+                disabled={isConnecting}
+                className="flex items-center space-x-2"
+              >
+                <Wallet className="h-4 w-4" />
+                {isConnecting ? "Connecting..." : "Connect Wallet"}
+              </Button>
+            )}
           </div>
         </div>
       </div>

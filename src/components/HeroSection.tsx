@@ -1,8 +1,45 @@
-
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, Users, ArrowRight } from "lucide-react";
+import { useState } from "react";
 
 const HeroSection = () => {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isViewingGovernance, setIsViewingGovernance] = useState(false);
+
+  const handleStartAnalysis = () => {
+    setIsAnalyzing(true);
+    
+    // Add visual effect
+    setTimeout(() => {
+      setIsAnalyzing(false);
+      // Scroll to DetectionFactors section
+      const detectionSection = document.getElementById('detection-factors');
+      if (detectionSection) {
+        detectionSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 500);
+  };
+
+  const handleViewGovernance = () => {
+    setIsViewingGovernance(true);
+    
+    // Add visual effect
+    setTimeout(() => {
+      setIsViewingGovernance(false);
+      // Scroll to GovernanceVoting section
+      const governanceSection = document.getElementById('governance-voting');
+      if (governanceSection) {
+        governanceSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 500);
+  };
+
   return (
     <section className="pt-20 pb-16 crypto-gradient text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -19,12 +56,46 @@ const HeroSection = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-12">
-            <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform hover:scale-105 transition-all duration-200">
-              Start Analysis
-              <ArrowRight className="ml-2 h-6 w-6" />
+            <Button 
+              size="lg" 
+              className={`bg-white text-purple-600 hover:bg-gray-100 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform transition-all duration-200 ${
+                isAnalyzing 
+                  ? 'scale-95 bg-purple-100 animate-pulse' 
+                  : 'hover:scale-105'
+              }`}
+              onClick={handleStartAnalysis}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600 mr-2"></div>
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  Start Analysis
+                  <ArrowRight className="ml-2 h-6 w-6" />
+                </>
+              )}
             </Button>
-            <Button size="lg" className="bg-blue-600 text-white hover:bg-blue-700 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform hover:scale-105 transition-all duration-200">
-              View Governance
+            <Button 
+              size="lg" 
+              className={`bg-blue-600 text-white hover:bg-blue-700 text-lg px-8 py-4 h-14 font-semibold shadow-xl transform transition-all duration-200 ${
+                isViewingGovernance 
+                  ? 'scale-95 bg-blue-500 animate-pulse' 
+                  : 'hover:scale-105'
+              }`}
+              onClick={handleViewGovernance}
+              disabled={isViewingGovernance}
+            >
+              {isViewingGovernance ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Loading...
+                </>
+              ) : (
+                'View Governance'
+              )}
             </Button>
           </div>
           

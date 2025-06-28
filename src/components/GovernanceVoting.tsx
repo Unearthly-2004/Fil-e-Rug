@@ -1,160 +1,382 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Users, FileText, Shield, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { Users, FileText, Shield, ExternalLink, Database, AlertTriangle, CheckCircle, Upload, FileCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useWallet } from "@/hooks/useWallet";
+import { voteOnChain, getVoteCount, checkIfVoted, VoteCount } from "@/lib/filecoin-vote";
+import { useFilecoinStorage } from "@/hooks/use-filecoin-storage";
+import { ChainData } from "@/lib/filecoin-storage";
+import { EnhancedFileUploader } from "./EnhancedFileUploader";
+import WalletStatus from "./WalletStatus";
+import { toast } from "@/hooks/use-toast";
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  size: number;
+  cid: string;
+  txHash: string;
+  timestamp: number;
+}
+
+interface VoteProof {
+  proposalId: string;
+  userAddress: string;
+  vote: 'rug' | 'no-rug';
+  files: UploadedFile[];
+  proofContractAddress: string;
+  timestamp: number;
+  blockNumber: number;
+  transactionHash: string;
+}
 
 const GovernanceVoting = () => {
   const [selectedVote, setSelectedVote] = useState<string | null>(null);
+  const [onChainVoteCounts, setOnChainVoteCounts] = useState<Record<string, VoteCount>>({});
+  const [userVotes, setUserVotes] = useState<Record<string, boolean>>({});
+  const [isVoting, setIsVoting] = useState<Record<string, boolean>>({});
+  const [showUploader, setShowUploader] = useState<Record<string, boolean>>({});
+  const [voteProofs, setVoteProofs] = useState<Record<string, VoteProof>>({});
+  
+  const { provider, address, isConnected, isCalibnet, switchToCalibnet, hasEnoughBalance } = useWallet();
+  const { storeChainData, isStoring } = useFilecoinStorage();
 
-  const proposals = [
-    {
-      id: "PROP-001",
-      title: "Ethereum Project: DeFiMax Token",
-      description: "Community assessment of DeFiMax token for potential rug pull indicators",
-      category: "Pending Review",
-      rugVotes: 342,
-      noRugVotes: 128,
-      totalVotes: 470,
-      timeLeft: "2 days",
-      riskFactors: ["High fake volume", "Anonymous team", "No audits"],
-      blockchain: "Filecoin"
-    },
-    {
-      id: "PROP-002", 
-      title: "Solana Project: MoonCoin",
-      description: "Automated Flow analysis flagged suspicious patterns requiring manual review",
-      category: "Flow Flagged",
-      rugVotes: 89,
-      noRugVotes: 234,
-      totalVotes: 323,
-      timeLeft: "5 days",
-      riskFactors: ["Coordinated transactions", "New project"],
-      blockchain: "Filecoin"
+  // TODO: Fetch proposals from the blockchain or a real source
+  const [proposals, setProposals] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Replace this with a real fetch from the blockchain or backend
+    async function fetchProposals() {
+      // Example: fetch from a smart contract or API
+      // const fetchedProposals = await getProposalsFromChain(provider);
+      // setProposals(fetchedProposals);
+      setProposals([]); // Placeholder: no hardcoded proposals
     }
-  ];
+    fetchProposals();
+  }, [provider]);
 
-  const handleVote = (proposalId: string, vote: 'rug' | 'no-rug') => {
+  // Fetch on-chain vote counts
+  useEffect(() => {
+    if (provider && isCalibnet) {
+      proposals.forEach(async (proposal) => {
+        const voteCount = await getVoteCount(provider as any, proposal.id);
+        if (voteCount) {
+          setOnChainVoteCounts(prev => ({
+            ...prev,
+            [proposal.id]: voteCount
+          }));
+        }
+      });
+    }
+  }, [provider, isCalibnet]);
+
+  // Check if user has voted on each proposal
+  useEffect(() => {
+    if (provider && address && isCalibnet) {
+      proposals.forEach(async (proposal) => {
+        const hasVoted = await checkIfVoted(provider as any, proposal.id, address);
+        if (hasVoted) {
+          setUserVotes(prev => ({
+            ...prev,
+            [proposal.id]: true
+          }));
+        }
+      });
+    }
+  }, [provider, address, isCalibnet]);
+
+  const handleVote = async (proposalId: string, vote: 'rug' | 'no-rug') => {
+    if (!isConnected) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your MetaMask wallet to vote",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isCalibnet) {
+      toast({
+        title: "Wrong Network",
+        description: "Please switch to Filecoin Calibnet to vote",
+        variant: "destructive",
+      });
+      await switchToCalibnet();
+      return;
+    }
+
+    if (!hasEnoughBalance()) {
+      toast({
+        title: "Insufficient Balance",
+        description: "You need tFIL for gas and tUSDFC for storage payments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (userVotes[proposalId]) {
+      toast({
+        title: "Already Voted",
+        description: "You have already voted on this proposal",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVoting(prev => ({ ...prev, [proposalId]: true }));
     setSelectedVote(`${proposalId}-${vote}`);
-    console.log(`Voted ${vote} for proposal ${proposalId}`);
+
+    try {
+      // On-chain vote: true = safe, false = rug
+      const result = await voteOnChain(provider as any, proposalId, vote === 'no-rug');
+      
+      if (result.success) {
+        toast({
+          title: "Vote Submitted Successfully",
+          description: `Transaction: ${result.txHash?.slice(0, 10)}...`,
+        });
+
+        // Mark user as voted
+        setUserVotes(prev => ({
+          ...prev,
+          [proposalId]: true
+        }));
+
+        // Show uploader after successful vote
+        setShowUploader(prev => ({
+          ...prev,
+          [proposalId]: true
+        }));
+
+        // Refresh on-chain vote counts
+        const newVoteCount = await getVoteCount(provider as any, proposalId);
+        if (newVoteCount) {
+          setOnChainVoteCounts(prev => ({
+            ...prev,
+            [proposalId]: newVoteCount
+          }));
+        }
+      } else {
+        toast({
+          title: "Vote Failed",
+          description: result.error || "Transaction failed",
+          variant: "destructive",
+        });
+        setSelectedVote(null);
+      }
+    } catch (error) {
+      console.error('Vote error:', error);
+      toast({
+        title: "Vote Error",
+        description: "Failed to submit vote. Please try again.",
+        variant: "destructive",
+      });
+      setSelectedVote(null);
+    } finally {
+      setIsVoting(prev => ({ ...prev, [proposalId]: false }));
+    }
+  };
+
+  const handleUploadComplete = (proposalId: string, files: UploadedFile[]) => {
+    toast({
+      title: "Files Uploaded Successfully",
+      description: `Uploaded ${files.length} files to Filecoin for proposal ${proposalId}`,
+    });
+  };
+
+  const handleGenerateProof = (proposalId: string, proofData: any) => {
+    setVoteProofs(prev => ({
+      ...prev,
+      [proposalId]: proofData
+    }));
+
+    toast({
+      title: "Proof Generated Successfully",
+      description: `Proof contract deployed at: ${proofData.proofContractAddress}`,
+    });
   };
 
   return (
-    <section id="governance" className="py-16 bg-white">
+    <section id="governance-voting" className="py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Community Governance
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Decentralized decision-making powered by Filecoin storage with cryptographic proof
+            Decentralized decision-making powered by Filecoin Calibnet with on-chain voting, permanent storage, and proof contracts
           </p>
+        </div>
+
+        {/* Wallet Status */}
+        <div className="mb-8">
+          <WalletStatus />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           {proposals.map((proposal) => {
             const rugPercentage = (proposal.rugVotes / proposal.totalVotes) * 100;
             const noRugPercentage = (proposal.noRugVotes / proposal.totalVotes) * 100;
+            const hasVoted = userVotes[proposal.id];
+            const isVotingThis = isVoting[proposal.id];
+            const showUploaderForThis = showUploader[proposal.id];
+            const voteProof = voteProofs[proposal.id];
             
             return (
-              <Card key={proposal.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline">{proposal.id}</Badge>
-                    <Badge className="bg-blue-100 text-blue-800">
-                      {proposal.category}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-xl">{proposal.title}</CardTitle>
-                  <CardDescription>{proposal.description}</CardDescription>
-                </CardHeader>
-                
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Risk Factors */}
-                    <div>
-                      <h4 className="font-semibold mb-2">Risk Factors:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {proposal.riskFactors.map((factor, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {factor}
+              <div key={proposal.id} className="space-y-4">
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="outline">{proposal.id}</Badge>
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-blue-100 text-blue-800">
+                          {proposal.category}
+                        </Badge>
+                        {hasVoted && (
+                          <Badge className="bg-green-100 text-green-800">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Voted
                           </Badge>
-                        ))}
+                        )}
+                        {voteProof && (
+                          <Badge className="bg-purple-100 text-purple-800">
+                            <FileCheck className="h-3 w-3 mr-1" />
+                            Proof Generated
+                          </Badge>
+                        )}
                       </div>
                     </div>
-
-                    {/* Voting Results */}
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-semibold">Current Votes</h4>
-                        <span className="text-sm text-gray-500">
-                          {proposal.totalVotes} votes • {proposal.timeLeft} left
-                        </span>
+                    <CardTitle className="text-xl">{proposal.title}</CardTitle>
+                    <CardDescription>{proposal.description}</CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    <div className="space-y-6">
+                      {/* Risk Factors */}
+                      <div>
+                        <h4 className="font-semibold mb-2">Risk Factors:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {proposal.riskFactors.map((factor, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {factor}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                      
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium text-red-600">RUG</span>
-                            <span className="text-sm text-red-600">
-                              {proposal.rugVotes} ({rugPercentage.toFixed(1)}%)
-                            </span>
-                          </div>
-                          <Progress value={rugPercentage} className="h-2 bg-red-100" />
+
+                      {/* Voting Results */}
+                      <div>
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="font-semibold">Current Votes</h4>
+                          <span className="text-sm text-gray-500">
+                            {proposal.totalVotes} votes • {proposal.timeLeft} left
+                          </span>
                         </div>
                         
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium text-green-600">NO RUG</span>
-                            <span className="text-sm text-green-600">
-                              {proposal.noRugVotes} ({noRugPercentage.toFixed(1)}%)
-                            </span>
+                        <div className="space-y-3">
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium text-red-600">RUG</span>
+                              <span className="text-sm text-red-600">
+                                {proposal.rugVotes} ({rugPercentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <Progress value={rugPercentage} className="h-2 bg-red-100" />
                           </div>
-                          <Progress value={noRugPercentage} className="h-2 bg-green-100" />
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium text-green-600">NO RUG</span>
+                              <span className="text-sm text-green-600">
+                                {proposal.noRugVotes} ({noRugPercentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <Progress value={noRugPercentage} className="h-2 bg-green-100" />
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Voting Buttons */}
-                    <div className="flex space-x-3">
-                      <Button
-                        onClick={() => handleVote(proposal.id, 'rug')}
-                        className="flex-1 rug-gradient text-white"
-                        disabled={selectedVote === `${proposal.id}-rug`}
-                      >
-                        {selectedVote === `${proposal.id}-rug` ? 'Voted RUG' : 'Vote RUG'}
-                      </Button>
-                      <Button
-                        onClick={() => handleVote(proposal.id, 'no-rug')}
-                        className="flex-1 safe-gradient text-white"
-                        disabled={selectedVote === `${proposal.id}-no-rug`}
-                      >
-                        {selectedVote === `${proposal.id}-no-rug` ? 'Voted SAFE' : 'Vote SAFE'}
-                      </Button>
-                    </div>
-
-                    {/* Blockchain Info */}
-                    <div className="flex items-center justify-between pt-3 border-t">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm text-gray-500">Stored on {proposal.blockchain}</span>
+                      {/* Voting Buttons */}
+                      <div className="flex space-x-3">
+                        <Button
+                          onClick={() => handleVote(proposal.id, 'rug')}
+                          className="flex-1 rug-gradient text-white"
+                          disabled={hasVoted || isVotingThis || !isConnected || !isCalibnet || !hasEnoughBalance()}
+                        >
+                          {isVotingThis ? 'Voting...' : 
+                           hasVoted ? 'Already Voted' : 
+                           selectedVote === `${proposal.id}-rug` ? 'Voted RUG' : 'Vote RUG'}
+                        </Button>
+                        <Button
+                          onClick={() => handleVote(proposal.id, 'no-rug')}
+                          className="flex-1 safe-gradient text-white"
+                          disabled={hasVoted || isVotingThis || !isConnected || !isCalibnet || !hasEnoughBalance()}
+                        >
+                          {isVotingThis ? 'Voting...' : 
+                           hasVoted ? 'Already Voted' : 
+                           selectedVote === `${proposal.id}-no-rug` ? 'Voted SAFE' : 'Vote SAFE'}
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        View Details
-                        <ExternalLink className="ml-1 h-3 w-3" />
-                      </Button>
+
+                      {/* Blockchain Info */}
+                      <div className="flex items-center justify-between pt-3 border-t">
+                        <div className="flex items-center space-x-2">
+                          <Database className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-500">Stored on Filecoin Calibnet</span>
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          View Details
+                          <ExternalLink className="ml-1 h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+
+                {/* Enhanced File Uploader - Show after voting */}
+                {showUploaderForThis && (
+                  <EnhancedFileUploader
+                    proposalId={proposal.id}
+                    proposalTitle={proposal.title}
+                    userVote={selectedVote?.includes('rug') ? 'rug' : 'no-rug'}
+                    onUploadComplete={(files) => handleUploadComplete(proposal.id, files)}
+                    onGenerateProof={(proofData) => handleGenerateProof(proposal.id, proofData)}
+                  />
+                )}
+
+                {/* Vote Proof Display */}
+                {voteProof && (
+                  <Card className="bg-purple-50 border-purple-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2 text-purple-800">
+                        <FileCheck className="h-5 w-5" />
+                        <span>Vote Proof Generated</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="text-sm space-y-1">
+                        <div><strong>Proof Contract:</strong> {voteProof.proofContractAddress}</div>
+                        <div><strong>Vote:</strong> {voteProof.vote === 'rug' ? 'RUG' : 'SAFE'}</div>
+                        <div><strong>Files Uploaded:</strong> {voteProof.files.length}</div>
+                        <div><strong>Block Number:</strong> {voteProof.blockNumber}</div>
+                        <div><strong>Transaction:</strong> {voteProof.transactionHash}</div>
+                        <div><strong>Timestamp:</strong> {new Date(voteProof.timestamp).toLocaleString()}</div>
+                      </div>
+                      <div className="text-xs text-purple-600">
+                        This contract serves as permanent proof of your vote and the associated evidence files on Filecoin Calibnet.
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             );
           })}
         </div>
 
         {/* Governance Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6 text-center">
               <Users className="h-12 w-12 text-purple-600 mx-auto mb-3" />
@@ -173,9 +395,17 @@ const GovernanceVoting = () => {
           
           <Card>
             <CardContent className="p-6 text-center">
-              <FileText className="h-12 w-12 text-green-600 mx-auto mb-3" />
+              <Upload className="h-12 w-12 text-green-600 mx-auto mb-3" />
               <h3 className="text-2xl font-bold">100%</h3>
-              <p className="text-gray-600">Decisions Archived</p>
+              <p className="text-gray-600">Files Stored on Filecoin</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6 text-center">
+              <FileCheck className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+              <h3 className="text-2xl font-bold">100%</h3>
+              <p className="text-gray-600">Proof Contracts Generated</p>
             </CardContent>
           </Card>
         </div>
