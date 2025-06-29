@@ -11,18 +11,30 @@ export function useWallet() {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
 
-  // Get tFIL balance
-  const { data: tfilBalance } = useBalance({
+  // Get tFIL balance - only fetch when on Calibnet
+  const { data: tfilBalance, refetch: refetchTfil } = useBalance({
     address,
     chainId: filecoinCalibnet.id,
+    watch: true, // Auto-refresh when balance changes
+    enabled: isConnected && chainId === filecoinCalibnet.id,
   });
 
-  // Get tUSDFC balance (using actual contract address from config)
-  const { data: tusdfcBalance } = useBalance({
+  // Get tUSDFC balance - only fetch when on Calibnet
+  const { data: tusdfcBalance, refetch: refetchTusdfc } = useBalance({
     address,
     chainId: filecoinCalibnet.id,
-    token: synapseConfig.contracts.usdfc, // Use the config value
+    token: synapseConfig.contracts.usdfc,
+    watch: true, // Auto-refresh when balance changes
+    enabled: isConnected && chainId === filecoinCalibnet.id,
   });
+
+  // Auto-refresh balances when network changes to Calibnet
+  useEffect(() => {
+    if (isConnected && chainId === filecoinCalibnet.id) {
+      refetchTfil();
+      refetchTusdfc();
+    }
+  }, [isConnected, chainId, refetchTfil, refetchTusdfc]);
 
   const connectWallet = async () => {
     setIsConnecting(true);
@@ -60,9 +72,21 @@ export function useWallet() {
   const switchToCalibnet = async () => {
     try {
       await switchChain({ chainId: filecoinCalibnet.id });
+      // Refresh balances after switching
+      setTimeout(() => {
+        refetchTfil();
+        refetchTusdfc();
+      }, 1000);
     } catch (error) {
       console.error("Failed to switch to Calibnet:", error);
       throw error;
+    }
+  };
+
+  const refreshBalances = () => {
+    if (isConnected && chainId === filecoinCalibnet.id) {
+      refetchTfil();
+      refetchTusdfc();
     }
   };
 
@@ -73,6 +97,7 @@ export function useWallet() {
     connect: connectWallet,
     disconnect,
     switchToCalibnet,
+    refreshBalances,
     isConnecting,
     isConnected,
     isCalibnet: chainId === filecoinCalibnet.id,

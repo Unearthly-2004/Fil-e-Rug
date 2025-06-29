@@ -21,7 +21,7 @@ import { useWallet } from "@/hooks/useWallet";
 const SynapseStorageManager: React.FC = () => {
   const { data, isLoading, isError, refetch } = useSynapseBalances();
   const { handlePayment, isLoading: isPaymentLoading } = useSynapsePayment();
-  const { isConnected, isCalibnet } = useWallet();
+  const { isConnected, isCalibnet, tfilBalance, tusdfcBalance } = useWallet();
 
   const {
     filBalance,
@@ -157,15 +157,15 @@ const SynapseStorageManager: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Wallet Balances */}
+        {/* Wallet Balances - Using wallet hook balances */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 mb-2">
                 <Wallet className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">FIL Balance</span>
+                <span className="text-sm font-medium">tFIL Balance</span>
               </div>
-              <p className="text-2xl font-bold">{filBalance} FIL</p>
+              <p className="text-2xl font-bold">{parseFloat(tfilBalance).toFixed(4)} tFIL</p>
               <p className="text-xs text-gray-500">For gas fees</p>
             </CardContent>
           </Card>
@@ -174,9 +174,9 @@ const SynapseStorageManager: React.FC = () => {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 mb-2">
                 <DollarSign className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium">USDFC Balance</span>
+                <span className="text-sm font-medium">tUSDFC Balance</span>
               </div>
-              <p className="text-2xl font-bold">{usdfcBalance} USDFC</p>
+              <p className="text-2xl font-bold">{parseFloat(tusdfcBalance).toFixed(2)} tUSDFC</p>
               <p className="text-xs text-gray-500">For storage payments</p>
             </CardContent>
           </Card>
@@ -201,19 +201,17 @@ const SynapseStorageManager: React.FC = () => {
               Storage Usage
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Used / Capacity</span>
-                <span className="text-sm text-gray-500">
-                  {storageUsage.toFixed(1)} GB / {storageCapacity} GB
-                </span>
-              </div>
-              <Progress value={storagePercentage} className="h-2" />
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">0 GB</span>
-                <span className="text-gray-500">{storageCapacity} GB</span>
-              </div>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Used: {storageUsage} GB</span>
+              <span className="text-sm text-gray-500">Capacity: {storageCapacity} GB</span>
+            </div>
+            <Progress value={storagePercentage} className="w-full" />
+            <div className="flex justify-between items-center text-sm">
+              <span>{storagePercentage.toFixed(1)}% used</span>
+              <span className={daysColor}>
+                {persistenceDaysLeft} days remaining
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -234,68 +232,51 @@ const SynapseStorageManager: React.FC = () => {
                 ) : (
                   <AlertTriangle className="h-5 w-5 text-red-500" />
                 )}
-                <span className="font-medium">Days Remaining</span>
+                <span className="font-medium">
+                  {isSufficient ? 'Sufficient Balance' : 'Insufficient Balance'}
+                </span>
               </div>
-              <Badge variant={isSufficient ? "default" : "destructive"}>
-                <span className={daysColor}>{persistenceDaysLeft} days</span>
+              <Badge variant={isSufficient ? 'default' : 'destructive'}>
+                {persistenceDaysLeft} days
               </Badge>
             </div>
-            
-            {!isSufficient && (
-              <Alert className="mt-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Low balance warning: Add more USDFC to maintain storage persistence.
-                </AlertDescription>
-              </Alert>
-            )}
           </CardContent>
         </Card>
 
         {/* Payment Actions */}
-        {parseFloat(depositNeeded) > 0 && (
+        {!isSufficient && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <TrendingUp className="h-5 w-5" />
-                Payment Required
+                Extend Storage
               </CardTitle>
               <CardDescription>
-                Deposit USDFC to maintain storage persistence
+                Add more USDFC to extend your storage persistence
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Rate Needed:</span>
-                    <p className="font-medium">{rateNeeded} USDFC/epoch</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Lockup Needed:</span>
-                    <p className="font-medium">{lockUpNeeded} USDFC</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Deposit Needed:</span>
-                    <p className="font-medium text-red-600">{depositNeeded} USDFC</p>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Rate Needed:</span>
+                  <p className="font-medium">{rateNeeded} USDFC</p>
                 </div>
-                
-                <Button 
-                  onClick={handleDeposit}
-                  disabled={isPaymentLoading}
-                  className="w-full"
-                >
-                  {isPaymentLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    `Deposit ${depositNeeded} USDFC`
-                  )}
-                </Button>
+                <div>
+                  <span className="text-gray-500">Lockup Needed:</span>
+                  <p className="font-medium">{lockUpNeeded} USDFC</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Deposit Needed:</span>
+                  <p className="font-medium">{depositNeeded} USDFC</p>
+                </div>
               </div>
+              <Button 
+                onClick={handleDeposit} 
+                disabled={isPaymentLoading}
+                className="w-full"
+              >
+                {isPaymentLoading ? 'Processing...' : 'Deposit USDFC'}
+              </Button>
             </CardContent>
           </Card>
         )}
