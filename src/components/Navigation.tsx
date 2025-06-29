@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Shield, BarChart3, Users, Wallet, AlertTriangle, Coins, Vote } from "lucide-react";
+import { Shield, BarChart3, Users, Wallet, AlertTriangle, Coins, Vote, DollarSign } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -12,7 +12,9 @@ const Navigation = () => {
     switchToCalibnet, 
     isConnecting, 
     isConnected, 
-    isCalibnet 
+    isCalibnet,
+    tfilBalance,
+    tusdfcBalance
   } = useWallet();
 
   const location = useLocation();
@@ -70,7 +72,7 @@ const Navigation = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Network Status */}
+            {/* Network Status and Balances */}
             {isConnected && !isCalibnet && (
               <Button
                 variant="outline"
@@ -84,8 +86,20 @@ const Navigation = () => {
             )}
             
             {isConnected && isCalibnet && (
-              <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                Calibnet
+              <div className="flex items-center space-x-3">
+                <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  Calibnet
+                </div>
+                {/* tFIL Balance Display */}
+                <div className="flex items-center space-x-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  <Coins className="h-3 w-3" />
+                  <span>{parseFloat(tfilBalance).toFixed(4)} tFIL</span>
+                </div>
+                {/* tUSDFC Balance Display */}
+                <div className="flex items-center space-x-1 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                  <DollarSign className="h-3 w-3" />
+                  <span>{parseFloat(tusdfcBalance).toFixed(2)} tUSDFC</span>
+                </div>
               </div>
             )}
 
