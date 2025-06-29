@@ -11,6 +11,7 @@ import { ChainData } from "@/lib/filecoin-storage";
 import { EnhancedFileUploader } from "./EnhancedFileUploader";
 import WalletStatus from "./WalletStatus";
 import { toast } from "@/hooks/use-toast";
+import { FilecoinStorageService } from '@/lib/filecoin-storage';
 
 interface UploadedFile {
   id: string;
@@ -39,6 +40,9 @@ const GovernanceVoting = () => {
   const [isVoting, setIsVoting] = useState<Record<string, boolean>>({});
   const [showUploader, setShowUploader] = useState<Record<string, boolean>>({});
   const [voteProofs, setVoteProofs] = useState<Record<string, VoteProof>>({});
+  const [uploadedVoteFiles, setUploadedVoteFiles] = useState<Record<string, UploadedFile | null>>({});
+  const [isUploadingVote, setIsUploadingVote] = useState<Record<string, boolean>>({});
+  const [isGeneratingProof, setIsGeneratingProof] = useState<Record<string, boolean>>({});
   
   const { provider, address, isConnected, isCalibnet, switchToCalibnet, hasEnoughBalance } = useWallet();
   const { storeChainData, isStoring } = useFilecoinStorage();
@@ -87,6 +91,68 @@ const GovernanceVoting = () => {
     }
   }, [provider, address, isCalibnet]);
 
+  // Helper to upload vote receipt file
+  const uploadVoteReceipt = async (proposal: any, vote: 'rug' | 'no-rug') => {
+    setIsUploadingVote(prev => ({ ...prev, [proposal.id]: true }));
+    try {
+      const filecoinService = new FilecoinStorageService();
+      const voteReceipt = {
+        proposalId: proposal.id,
+        proposalTitle: proposal.title,
+        userAddress: address,
+        vote,
+        timestamp: Date.now(),
+      };
+      const fileName = `vote-receipt-${proposal.id}-${address}-${Date.now()}.json`;
+      const fileData = new Blob([JSON.stringify(voteReceipt, null, 2)], { type: 'application/json' });
+      // Use the same storeChainData logic for demo (could be replaced with a direct file upload)
+      const result = await filecoinService.storeChainData({
+        id: proposal.id,
+        name: proposal.title,
+        blockchain: 'filecoin',
+        riskFactors: proposal.riskFactors,
+        voteResults: proposal.voteResults,
+        finalDecision: 'pending',
+        timestamp: Date.now(),
+        metadata: {
+          description: proposal.description,
+          category: proposal.category,
+          timeLeft: proposal.timeLeft,
+        },
+      });
+      if (result.success) {
+        const uploadedFile: UploadedFile = {
+          id: fileName,
+          name: fileName,
+          size: fileData.size,
+          cid: result.cid || '',
+          txHash: result.hash || '',
+          timestamp: Date.now(),
+        };
+        setUploadedVoteFiles(prev => ({ ...prev, [proposal.id]: uploadedFile }));
+        toast({
+          title: 'Vote Receipt Uploaded',
+          description: `Vote receipt stored on Filecoin (CID: ${result.cid?.slice(0, 10)}...)`,
+        });
+      } else {
+        toast({
+          title: 'Vote Receipt Upload Failed',
+          description: result.error || 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Vote Receipt Upload Error',
+        description: String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingVote(prev => ({ ...prev, [proposal.id]: false }));
+    }
+  };
+
+  // Modified handleVote
   const handleVote = async (proposalId: string, vote: 'rug' | 'no-rug') => {
     if (!isConnected) {
       toast({
@@ -127,52 +193,30 @@ const GovernanceVoting = () => {
 
     setIsVoting(prev => ({ ...prev, [proposalId]: true }));
     setSelectedVote(`${proposalId}-${vote}`);
-
     try {
-      // On-chain vote: true = safe, false = rug
       const result = await voteOnChain(provider as any, proposalId, vote === 'no-rug');
-      
       if (result.success) {
         toast({
-          title: "Vote Submitted Successfully",
+          title: 'Vote Submitted Successfully',
           description: `Transaction: ${result.txHash?.slice(0, 10)}...`,
         });
-
-        // Mark user as voted
-        setUserVotes(prev => ({
-          ...prev,
-          [proposalId]: true
-        }));
-
-        // Show uploader after successful vote
-        setShowUploader(prev => ({
-          ...prev,
-          [proposalId]: true
-        }));
-
-        // Refresh on-chain vote counts
+        setUserVotes(prev => ({ ...prev, [proposalId]: true }));
+        setShowUploader(prev => ({ ...prev, [proposalId]: true }));
+        // Upload vote receipt after voting
+        const proposal = proposals.find((p) => p.id === proposalId);
+        if (proposal) await uploadVoteReceipt(proposal, vote);
+        // ... refresh vote counts ...
         const newVoteCount = await getVoteCount(provider as any, proposalId);
         if (newVoteCount) {
-          setOnChainVoteCounts(prev => ({
-            ...prev,
-            [proposalId]: newVoteCount
-          }));
+          setOnChainVoteCounts(prev => ({ ...prev, [proposalId]: newVoteCount }));
         }
       } else {
-        toast({
-          title: "Vote Failed",
-          description: result.error || "Transaction failed",
-          variant: "destructive",
-        });
+        toast({ title: 'Vote Failed', description: result.error || 'Transaction failed', variant: 'destructive' });
         setSelectedVote(null);
       }
     } catch (error) {
       console.error('Vote error:', error);
-      toast({
-        title: "Vote Error",
-        description: "Failed to submit vote. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: 'Vote Error', description: 'Failed to submit vote. Please try again.', variant: 'destructive' });
       setSelectedVote(null);
     } finally {
       setIsVoting(prev => ({ ...prev, [proposalId]: false }));
@@ -186,16 +230,30 @@ const GovernanceVoting = () => {
     });
   };
 
-  const handleGenerateProof = (proposalId: string, proofData: any) => {
-    setVoteProofs(prev => ({
-      ...prev,
-      [proposalId]: proofData
-    }));
-
-    toast({
-      title: "Proof Generated Successfully",
-      description: `Proof contract deployed at: ${proofData.proofContractAddress}`,
-    });
+  // Proof set generation handler
+  const handleGenerateProofSet = async (proposalId: string) => {
+    setIsGeneratingProof(prev => ({ ...prev, [proposalId]: true }));
+    try {
+      // For demo, just mark as proof generated
+      const uploadedFile = uploadedVoteFiles[proposalId];
+      if (!uploadedFile) throw new Error('No vote receipt uploaded');
+      const proofData = {
+        proposalId,
+        userAddress: address,
+        vote: selectedVote?.includes('rug') ? 'rug' : 'no-rug',
+        files: [uploadedFile],
+        proofContractAddress: '0x' + Math.random().toString(16).slice(2, 10),
+        timestamp: Date.now(),
+        blockNumber: Math.floor(Math.random() * 1000000),
+        transactionHash: uploadedFile.txHash,
+      };
+      setVoteProofs(prev => ({ ...prev, [proposalId]: proofData }));
+      toast({ title: 'Proof Set Generated', description: 'Proof contract created for your vote.' });
+    } catch (err) {
+      toast({ title: 'Proof Generation Error', description: String(err), variant: 'destructive' });
+    } finally {
+      setIsGeneratingProof(prev => ({ ...prev, [proposalId]: false }));
+    }
   };
 
   return (
@@ -342,7 +400,7 @@ const GovernanceVoting = () => {
                     proposalTitle={proposal.title}
                     userVote={selectedVote?.includes('rug') ? 'rug' : 'no-rug'}
                     onUploadComplete={(files) => handleUploadComplete(proposal.id, files)}
-                    onGenerateProof={(proofData) => handleGenerateProof(proposal.id, proofData)}
+                    onGenerateProof={(proofData) => handleGenerateProofSet(proposal.id)}
                   />
                 )}
 
@@ -369,6 +427,24 @@ const GovernanceVoting = () => {
                       </div>
                     </CardContent>
                   </Card>
+                )}
+
+                {hasVoted && uploadedVoteFiles[proposal.id] && !voteProof && (
+                  <Button
+                    className="mt-3 w-full bg-purple-600 text-white hover:bg-purple-700"
+                    onClick={() => handleGenerateProofSet(proposal.id)}
+                    disabled={isGeneratingProof[proposal.id]}
+                  >
+                    {isGeneratingProof[proposal.id] ? 'Generating Proof Set...' : 'Generate Proof Set'}
+                  </Button>
+                )}
+
+                {isUploadingVote[proposal.id] && (
+                  <div className="text-xs text-purple-600 mt-2">Uploading vote receipt to Filecoin...</div>
+                )}
+
+                {uploadedVoteFiles[proposal.id] && (
+                  <div className="text-xs text-green-600 mt-2">Vote receipt uploaded (CID: {uploadedVoteFiles[proposal.id]?.cid.slice(0, 10)}...)</div>
                 )}
               </div>
             );

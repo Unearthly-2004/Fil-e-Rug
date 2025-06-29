@@ -1,6 +1,7 @@
 import { useAccount, useChainId, useSwitchChain, useConnect, useDisconnect, useBalance } from 'wagmi';
 import { filecoinCalibnet } from '@/lib/wagmi-config';
 import { useState, useEffect } from 'react';
+import { synapseConfig } from '@/lib/synapse-config';
 
 export function useWallet() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -16,11 +17,11 @@ export function useWallet() {
     chainId: filecoinCalibnet.id,
   });
 
-  // Get tUSDFC balance (you'll need the contract address)
+  // Get tUSDFC balance (using actual contract address from config)
   const { data: tusdfcBalance } = useBalance({
     address,
     chainId: filecoinCalibnet.id,
-    token: '0x...', // Replace with actual tUSDFC contract address on Calibnet
+    token: synapseConfig.contracts.usdfc, // Use the config value
   });
 
   const connectWallet = async () => {

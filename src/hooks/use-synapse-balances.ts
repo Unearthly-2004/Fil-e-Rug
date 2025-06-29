@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { useWallet } from './useWallet';
 import { synapseConfig, calculateStorageMetrics } from '@/lib/synapse-config';
 import { toast } from 'sonner';
+import { Synapse, TOKENS } from '@filoz/synapse-sdk';
+
+// Minimal ERC20 ABI for balanceOf and decimals
+const ERC20_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)"
+];
 
 interface BalanceData {
   filBalance: string;
@@ -46,31 +53,34 @@ export const useSynapseBalances = () => {
     setError(null);
 
     try {
-      // Mock balance fetching - replace with actual Synapse SDK calls
-      const mockBalances = {
-        filBalance: '1.5',
-        usdfcBalance: '100.0',
-        pandoraBalance: '50.0',
-        storageUsage: 2.5, // GB
-      };
+      // 1. Get FIL balance (native)
+      const filBalanceRaw = await Synapse.walletBalance(TOKENS.FIL);
+      const filBalance = filBalanceRaw.toString();
+
+      // 2. Get USDFC balance (ERC20)
+      const usdfcBalanceRaw = await Synapse.payments.walletBalance(TOKENS.USDFC);
+      const usdfcBalance = usdfcBalanceRaw.toString();
+
+      // 3. Get Pandora balance (ERC20)
+      const pandoraBalanceRaw = await Synapse.payments.walletBalance(TOKENS.PANDORA);
+      const pandoraBalance = pandoraBalanceRaw.toString();
 
       const metrics = calculateStorageMetrics(synapseConfig);
       const persistenceDaysLeft = Math.floor(
-        parseFloat(mockBalances.pandoraBalance) / metrics.dailyCost
+        parseFloat(pandoraBalance) / metrics.dailyCost
       );
-
       const isSufficient = persistenceDaysLeft >= synapseConfig.minDaysThreshold;
 
       setData({
-        filBalance: mockBalances.filBalance,
-        usdfcBalance: mockBalances.usdfcBalance,
-        pandoraBalance: mockBalances.pandoraBalance,
+        filBalance,
+        usdfcBalance,
+        pandoraBalance,
         persistenceDaysLeft,
         isSufficient,
         rateNeeded: metrics.rateAllowance.toString(),
         lockUpNeeded: metrics.lockupAllowance.toString(),
-        depositNeeded: (metrics.lockupAllowance - parseFloat(mockBalances.pandoraBalance)).toString(),
-        storageUsage: mockBalances.storageUsage,
+        depositNeeded: (metrics.lockupAllowance - parseFloat(pandoraBalance)).toString(),
+        storageUsage: 0, // Replace with real usage if available
         storageCapacity: synapseConfig.storageCapacity,
       });
 
@@ -86,7 +96,6 @@ export const useSynapseBalances = () => {
   useEffect(() => {
     if (isConnected && isCalibnet) {
       fetchBalances();
-      
       // Refresh balances every 30 seconds
       const interval = setInterval(fetchBalances, 30000);
       return () => clearInterval(interval);

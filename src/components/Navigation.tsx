@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Shield, BarChart3, Users, Wallet, AlertTriangle } from "lucide-react";
+import { Shield, BarChart3, Users, Wallet, AlertTriangle, Coins, Vote } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 const Navigation = () => {
   const { 
@@ -14,38 +15,10 @@ const Navigation = () => {
     isCalibnet 
   } = useWallet();
 
-  const [isNavigating, setIsNavigating] = useState<string | null>(null);
+  const location = useLocation();
 
-  const handleNavigation = (section: string) => {
-    setIsNavigating(section);
-    
-    // Add visual effect and scroll
-    setTimeout(() => {
-      setIsNavigating(null);
-      
-      let targetSection: HTMLElement | null = null;
-      
-      switch (section) {
-        case 'governance':
-          targetSection = document.getElementById('governance-voting');
-          break;
-        case 'analytics':
-          targetSection = document.getElementById('detection-factors');
-          break;
-        case 'dashboard':
-          targetSection = document.getElementById('detection-factors');
-          break;
-        default:
-          break;
-      }
-      
-      if (targetSection) {
-        targetSection.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'start'
-        });
-      }
-    }, 300);
+  const isActive = (path: string) => {
+    return location.pathname === path;
   };
 
   return (
@@ -54,36 +27,46 @@ const Navigation = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2">
             <Shield className="h-8 w-8 text-purple-600" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               Fil-E-Rug
-            </span>
+            </Link>
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
-            <button 
-              onClick={() => handleNavigation('dashboard')}
+            <Link 
+              to="/"
               className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
-                isNavigating === 'dashboard' ? 'text-purple-600 scale-95' : ''
+                isActive('/') ? 'text-purple-600' : ''
               }`}
             >
               Dashboard
-            </button>
-            <button 
-              onClick={() => handleNavigation('governance')}
-              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
-                isNavigating === 'governance' ? 'text-purple-600 scale-95' : ''
+            </Link>
+            <Link 
+              to="/memecoin-voting"
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 flex items-center space-x-1 ${
+                isActive('/memecoin-voting') ? 'text-purple-600' : ''
               }`}
             >
-              Governance
-            </button>
-            <button 
-              onClick={() => handleNavigation('analytics')}
-              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
-                isNavigating === 'analytics' ? 'text-purple-600 scale-95' : ''
+              <Coins className="h-4 w-4" />
+              <span>Memecoin Voting</span>
+            </Link>
+            <Link 
+              to="/governance"
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 flex items-center space-x-1 ${
+                isActive('/governance') ? 'text-purple-600' : ''
               }`}
             >
-              Analytics
-            </button>
+              <Vote className="h-4 w-4" />
+              <span>Governance</span>
+            </Link>
+            <Link 
+              to="/synapse-storage"
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
+                isActive('/synapse-storage') ? 'text-purple-600' : ''
+              }`}
+            >
+              Storage
+            </Link>
           </div>
           
           <div className="flex items-center space-x-4">

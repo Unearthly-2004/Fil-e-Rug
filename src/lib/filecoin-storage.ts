@@ -47,7 +47,7 @@ try {
   ipfs = null;
 }
 
-class FilecoinStorageService {
+export class FilecoinStorageService {
   private readonly RUGGED_CHAINS_KEY = 'rugged-chains';
   private readonly SAFE_CHAINS_KEY = 'safe-chains';
   private readonly PENDING_CHAINS_KEY = 'pending-chains';

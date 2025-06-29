@@ -19,7 +19,7 @@ import { useSynapsePayment } from "@/hooks/use-synapse-payment";
 import { useWallet } from "@/hooks/useWallet";
 
 const SynapseStorageManager: React.FC = () => {
-  const { data, isLoading, isError } = useSynapseBalances();
+  const { data, isLoading, isError, refetch } = useSynapseBalances();
   const { handlePayment, isLoading: isPaymentLoading } = useSynapsePayment();
   const { isConnected, isCalibnet } = useWallet();
 
@@ -49,7 +49,7 @@ const SynapseStorageManager: React.FC = () => {
 
     if (result.success) {
       // Refresh balances after successful payment
-      window.location.reload();
+      refetch();
     }
   };
 

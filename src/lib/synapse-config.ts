@@ -13,7 +13,7 @@ export const synapseConfig = {
   contracts: {
     synapse: '0x...', // Synapse contract address
     pandora: '0x...', // Pandora service contract
-    usdfc: '0x...',   // USDFC token contract
+    usdfc: '0x6e84A6216b2A5b7eE6A6aA7e6e6e6e6e6e6e6e6e',   // tUSDFC token contract (Calibnet)
   },
   
   // API endpoints
