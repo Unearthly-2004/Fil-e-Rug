@@ -86,20 +86,8 @@ const Navigation = () => {
             )}
             
             {isConnected && isCalibnet && (
-              <div className="flex items-center space-x-3">
-                <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  Calibnet
-                </div>
-                {/* tFIL Balance Display */}
-                <div className="flex items-center space-x-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  <Coins className="h-3 w-3" />
-                  <span>{parseFloat(tfilBalance).toFixed(4)} tFIL</span>
-                </div>
-                {/* tUSDFC Balance Display */}
-                <div className="flex items-center space-x-1 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                  <DollarSign className="h-3 w-3" />
-                  <span>{parseFloat(tusdfcBalance).toFixed(2)} tUSDFC</span>
-                </div>
+              <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                Calibnet
               </div>
             )}
 
