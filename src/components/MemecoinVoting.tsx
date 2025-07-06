@@ -43,6 +43,7 @@ import { useSynapseStorage } from "@/hooks/use-synapse-storage";
 import { useSynapseBalances } from "@/hooks/use-synapse-balances";
 import { useCoinGecko, Memecoin } from "@/hooks/use-coingecko";
 import { toast } from "@/hooks/use-toast";
+import { useNavigate } from 'react-router-dom';
 
 interface VoteData {
   coinId: string;
@@ -99,6 +100,7 @@ const MemecoinVoting: React.FC = () => {
   const { uploadFileMutation, progress, status, uploadedInfo } = useSynapseStorage();
   const { data: balances, isLoading: balancesLoading } = useSynapseBalances();
   const { memecoins, isLoading, error, refetch } = useCoinGecko();
+  const navigate = useNavigate();
 
   // Filter and sort coins
   useEffect(() => {
@@ -154,71 +156,13 @@ const MemecoinVoting: React.FC = () => {
 
   // Refactored castVote
   const castVote = async (coinId: string, vote: 'safe' | 'rug' | 'neutral') => {
-    if (!isConnected || !isCalibnet) {
-      toast({
-        title: "Connection Required",
-        description: "Please connect your wallet and switch to Calibnet",
-        variant: "destructive"
-      });
+    const coin = memecoins.find(c => c.id === coinId);
+    if (!coin) {
+      toast({ title: 'Vote Error', description: 'Coin not found.', variant: 'destructive' });
       return;
     }
-
-    if (!hasEnoughBalance()) {
-      toast({
-        title: "Insufficient Balance",
-        description: "You need tFIL for gas and tUSDFC for storage payments",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const confidence = voteConfidence[coinId] || 5;
-    const reasoning = voteReasoning[coinId] || '';
-
-    if (confidence < 1 || confidence > 10) {
-      toast({
-        title: "Invalid Confidence Level",
-        description: "Please select a confidence level between 1-10",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsVoting(prev => ({ ...prev, [coinId]: true }));
-
-    try {
-      const coin = memecoins.find(c => c.id === coinId);
-      if (!coin) throw new Error('Coin not found');
-
-      const voteData: VoteData = {
-        coinId,
-        voter: address || '',
-        vote,
-        confidence,
-        reasoning,
-        timestamp: Date.now(),
-        cid: '',
-        proofContract: '',
-        marketData: {
-          price: coin.current_price,
-          marketCap: coin.market_cap,
-          volume24h: coin.total_volume,
-          priceChange24h: coin.price_change_percentage_24h
-        }
-      };
-
-      // Save to pending votes instead of submitting
-      savePendingVote(voteData);
-      toast({
-        title: 'Vote Saved',
-        description: 'Your vote has been saved to My Votes. Submit it from the My Votes page.'
-      });
-    } catch (error) {
-      console.error('Vote error:', error);
-      toast({ title: 'Vote Error', description: 'Failed to save vote. Please try again.', variant: 'destructive' });
-    } finally {
-      setIsVoting(prev => ({ ...prev, [coinId]: false }));
-    }
+    // Redirect to Lighthouse Storage Vote tab with coin name as Proposal ID
+    navigate(`/lighthouse-storage?vote=${encodeURIComponent(coin.name)}`);
   };
 
   const formatCurrency = (value: number) => {

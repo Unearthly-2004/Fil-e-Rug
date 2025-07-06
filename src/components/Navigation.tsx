@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Shield, BarChart3, Users, Wallet, AlertTriangle, Coins, Vote, DollarSign } from "lucide-react";
+import { Shield, BarChart3, Users, Wallet, AlertTriangle, Coins, Vote, DollarSign, Database } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const Navigation = () => {
   const { 
@@ -61,14 +62,24 @@ const Navigation = () => {
               <Vote className="h-4 w-4" />
               <span>Governance</span>
             </Link>
-            <Link 
-              to="/synapse-storage"
-              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
-                isActive('/synapse-storage') ? 'text-purple-600' : ''
-              }`}
-            >
-              Storage
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 flex items-center space-x-1 ${
+                  isActive('/synapse-storage') || isActive('/lighthouse-storage') ? 'text-purple-600' : ''
+                }`}>
+                  <Database className="h-4 w-4" />
+                  <span>Storage</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/synapse-storage" className="w-full">Synapse Storage</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/lighthouse-storage" className="w-full">Lighthouse Storage</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link 
               to="/chatbot"
               className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${

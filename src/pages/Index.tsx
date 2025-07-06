@@ -127,7 +127,7 @@ const Index: React.FC = () => {
                 </div>
                 <CardTitle className="text-xl">Filecoin Storage</CardTitle>
                 <CardDescription>
-                  Advanced file storage with Proof of Data Possession (PDP) on Filecoin
+                  Advanced file storage with Synapse SDK and Lighthouse Web3 integration
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -145,12 +145,20 @@ const Index: React.FC = () => {
                     <span>Decentralized storage</span>
                   </div>
                 </div>
-                <Link to="/synapse-storage">
-                  <Button className="w-full bg-green-600 hover:bg-green-700">
-                    Manage Storage
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <div className="space-y-2">
+                  <Link to="/synapse-storage">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 mb-2">
+                      Synapse Storage
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/lighthouse-storage">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                      Lighthouse Storage
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           </div>

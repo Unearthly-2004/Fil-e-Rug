@@ -11,6 +11,7 @@ import MemecoinVoting from '@/components/MemecoinVoting';
 import FilecoinDemo from '@/components/FilecoinDemo';
 import SynapseStorageManager from '@/components/SynapseStorageManager';
 import SynapseFileUploader from '@/components/SynapseFileUploader';
+import LighthouseStorage from '@/components/LighthouseStorage';
 import NotFound from '@/pages/NotFound';
 import Index from '@/pages/Index';
 import MyVotes from './pages/MyVotes';
@@ -28,6 +29,7 @@ function App() {
           <Route path="/filecoin-demo" element={<FilecoinDemo />} />
           <Route path="/synapse-storage" element={<SynapseStorageManager />} />
           <Route path="/synapse-upload" element={<SynapseFileUploader />} />
+          <Route path="/lighthouse-storage" element={<LighthouseStorage />} />
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/my-votes" element={<MyVotes />} />
           <Route path="*" element={<NotFound />} />

@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { voteOnChain, getVoteCount, checkIfVoted, VoteCount } from "@/lib/filecoin-vote";
 import { useFilecoinStorage } from "@/hooks/use-filecoin-storage";
+import { useLighthouseStorage } from "@/hooks/use-lighthouse-storage";
 import { ChainData } from "@/lib/filecoin-storage";
 import { EnhancedFileUploader } from "./EnhancedFileUploader";
 import WalletStatus from "./WalletStatus";
@@ -46,6 +47,7 @@ const GovernanceVoting = () => {
   
   const { provider, address, isConnected, isCalibnet, switchToCalibnet, hasEnoughBalance } = useWallet();
   const { storeChainData, isStoring } = useFilecoinStorage();
+  const { uploadVote: uploadVoteToLighthouse, isUploadingVote: isUploadingToLighthouse } = useLighthouseStorage();
 
   // TODO: Fetch proposals from the blockchain or a real source
   const [proposals, setProposals] = useState<any[]>([]);
@@ -93,6 +95,79 @@ const GovernanceVoting = () => {
 
   // Helper to upload vote receipt file
   const uploadVoteReceipt = async (proposal: any, vote: 'rug' | 'no-rug') => {
+    setIsUploadingVote(prev => ({ ...prev, [proposal.id]: true }));
+    try {
+      // Upload to Lighthouse as well
+      const voteData = {
+        proposalId: proposal.id,
+        proposalTitle: proposal.title,
+        userAddress: address,
+        vote,
+        timestamp: Date.now(),
+        reasoning: `Vote cast for proposal: ${proposal.title}`,
+        confidence: 85
+      };
+      
+      // Upload to Lighthouse
+      const lighthouseResult = await uploadVoteToLighthouse(voteData, address);
+      
+      const filecoinService = new FilecoinStorageService();
+      const voteReceipt = {
+        proposalId: proposal.id,
+        proposalTitle: proposal.title,
+        userAddress: address,
+        vote,
+        timestamp: Date.now(),
+        lighthouseCid: lighthouseResult.success ? lighthouseResult.cid : null
+      };
+      const fileName = `vote-receipt-${proposal.id}-${address}-${Date.now()}.json`;
+      const fileData = new Blob([JSON.stringify(voteReceipt, null, 2)], { type: 'application/json' });
+      // Use the same storeChainData logic for demo (could be replaced with a direct file upload)
+      const result = await filecoinService.storeChainData({
+        id: proposal.id,
+        name: proposal.title,
+        blockchain: 'filecoin',
+        riskFactors: proposal.riskFactors,
+        voteResults: proposal.voteResults,
+        finalDecision: 'pending',
+        timestamp: Date.now(),
+        metadata: {
+          description: proposal.description,
+          category: proposal.category,
+          timeLeft: proposal.timeLeft,
+        },
+      });
+      if (result.success) {
+        const uploadedFile: UploadedFile = {
+          id: fileName,
+          name: fileName,
+          size: fileData.size,
+          cid: result.cid || '',
+          txHash: result.hash || '',
+          timestamp: Date.now(),
+        };
+        setUploadedVoteFiles(prev => ({ ...prev, [proposal.id]: uploadedFile }));
+        toast({
+          title: 'Vote Receipt Uploaded',
+          description: `Vote receipt stored on Filecoin (CID: ${result.cid?.slice(0, 10)}...) and Lighthouse (CID: ${lighthouseResult.cid?.slice(0, 10)}...)`,
+        });
+      } else {
+        toast({
+          title: 'Vote Receipt Upload Failed',
+          description: result.error || 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Vote Receipt Upload Error',
+        description: String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingVote(prev => ({ ...prev, [proposal.id]: false }));
+    }
+  };
     setIsUploadingVote(prev => ({ ...prev, [proposal.id]: true }));
     try {
       const filecoinService = new FilecoinStorageService();
