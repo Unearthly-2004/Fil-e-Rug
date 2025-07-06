@@ -24,11 +24,11 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
+    <nav className="fixed top-0 w-full z-50 border-b border-gray-200" style={{ background: "url('/banner.png') center/cover no-repeat" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-purple-600" />
+            <img src="/logo.png" alt="Logo" className="h-8 w-8" />
             <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               Fil-E-Rug
             </Link>
@@ -68,6 +68,14 @@ const Navigation = () => {
               }`}
             >
               Storage
+            </Link>
+            <Link 
+              to="/chatbot"
+              className={`text-gray-600 hover:text-purple-600 font-medium transition-all duration-200 ${
+                isActive('/chatbot') ? 'text-purple-600' : ''
+              }`}
+            >
+              Chatbot
             </Link>
           </div>
           

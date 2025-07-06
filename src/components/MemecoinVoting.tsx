@@ -128,7 +128,31 @@ const MemecoinVoting: React.FC = () => {
     setFilteredCoins(filtered);
   }, [memecoins, searchTerm, sortBy]);
 
-  // Cast vote on memecoin
+  // Helper to manage pending votes in localStorage
+  const PENDING_VOTES_KEY = 'pendingVotes';
+  function getPendingVotes() {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_VOTES_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  }
+  function savePendingVote(voteObj: any) {
+    const votes = getPendingVotes();
+    // Remove any existing vote for this coin by this user
+    const filtered = votes.filter((v: any) => v.coinId !== voteObj.coinId || v.voter !== voteObj.voter);
+    filtered.push(voteObj);
+    localStorage.setItem(PENDING_VOTES_KEY, JSON.stringify(filtered));
+  }
+
+  // Remove userVotes for marking a vote as completed
+  // Instead, check if a vote is pending in localStorage
+  function isVotePending(coinId: string) {
+    const votes = getPendingVotes();
+    return votes.some((v: any) => v.coinId === coinId && v.voter === address);
+  }
+
+  // Refactored castVote
   const castVote = async (coinId: string, vote: 'safe' | 'rug' | 'neutral') => {
     if (!isConnected || !isCalibnet) {
       toast({
@@ -174,7 +198,7 @@ const MemecoinVoting: React.FC = () => {
         reasoning,
         timestamp: Date.now(),
         cid: '',
-        proofContract: '0x' + Math.random().toString(16).slice(2, 10),
+        proofContract: '',
         marketData: {
           price: coin.current_price,
           marketCap: coin.market_cap,
@@ -183,76 +207,15 @@ const MemecoinVoting: React.FC = () => {
         }
       };
 
-      // Create vote receipt JSON
-      const voteReceipt = {
-        coinId: voteData.coinId,
-        coinSymbol: coin.symbol,
-        coinName: coin.name,
-        voter: voteData.voter,
-        vote: voteData.vote,
-        confidence: voteData.confidence,
-        reasoning: voteData.reasoning,
-        timestamp: voteData.timestamp,
-        marketData: voteData.marketData,
-        proofContract: voteData.proofContract
-      };
-
-      const voteFile = new File(
-        [JSON.stringify(voteReceipt, null, 2)],
-        `vote-receipt-${voteData.coinId}-${voteData.voter}-${Date.now()}.json`,
-        { type: 'application/json' }
-      );
-
-      // Upload to Filecoin using Synapse
-      await uploadFileMutation.mutateAsync(voteFile);
-      
-      // Wait a bit for the state to update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if we have uploaded info from the mutation
-      if (uploadedInfo?.commp) {
-        voteData.cid = uploadedInfo.commp;
-        setUserVotes(prev => ({ ...prev, [coinId]: voteData }));
-
-        // Add to audit trail
-        const auditEntry: AuditEntry = {
-          id: `audit-${Date.now()}`,
-          action: 'vote_cast',
-          user: address || '',
-          timestamp: Date.now(),
-          details: { 
-            coinId: voteData.coinId, 
-            vote: voteData.vote, 
-            confidence: voteData.confidence 
-          },
-          cid: uploadedInfo.commp,
-          blockNumber: Math.floor(Math.random() * 1000000),
-          transactionHash: uploadedInfo.txHash || 'mock-tx'
-        };
-
-        setAuditTrail(prev => [auditEntry, ...prev]);
-
-        toast({
-          title: "Vote Cast Successfully",
-          description: `Your ${vote} vote on ${coin.symbol.toUpperCase()} has been recorded and stored permanently on Filecoin`
-        });
-      } else {
-        // Fallback for when uploadedInfo is not available
-        voteData.cid = 'mock-cid-' + Date.now();
-        setUserVotes(prev => ({ ...prev, [coinId]: voteData }));
-
-        toast({
-          title: "Vote Cast Successfully",
-          description: `Your ${vote} vote on ${coin.symbol.toUpperCase()} has been recorded (mock storage)`
-        });
-      }
-    } catch (error) {
-      console.error('Vote failed:', error);
+      // Save to pending votes instead of submitting
+      savePendingVote(voteData);
       toast({
-        title: "Vote Failed",
-        description: "Failed to cast vote",
-        variant: "destructive"
+        title: 'Vote Saved',
+        description: 'Your vote has been saved to My Votes. Submit it from the My Votes page.'
       });
+    } catch (error) {
+      console.error('Vote error:', error);
+      toast({ title: 'Vote Error', description: 'Failed to save vote. Please try again.', variant: 'destructive' });
     } finally {
       setIsVoting(prev => ({ ...prev, [coinId]: false }));
     }
@@ -409,7 +372,7 @@ const MemecoinVoting: React.FC = () => {
           <TabsContent value="voting" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCoins.map((coin) => {
-                const userVote = userVotes[coin.id];
+                const isPending = isVotePending(coin.id);
                 const isVotingThis = isVoting[coin.id];
                 
                 return (
@@ -418,12 +381,6 @@ const MemecoinVoting: React.FC = () => {
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="outline">#{coin.market_cap_rank}</Badge>
                         <div className="flex items-center space-x-2">
-                          {userVote && (
-                            <Badge className={getVoteColor(userVote.vote)}>
-                              {getVoteIcon(userVote.vote)}
-                              <span className="ml-1">{userVote.vote.toUpperCase()}</span>
-                            </Badge>
-                          )}
                           <Badge className={`${
                             coin.price_change_percentage_24h >= 0 
                               ? 'bg-green-100 text-green-800' 
@@ -466,82 +423,75 @@ const MemecoinVoting: React.FC = () => {
                       </div>
 
                       {/* Voting Section */}
-                      {!userVote ? (
-                        <div className="space-y-3">
-                          <p className="text-sm text-gray-600">Cast your vote (stored on Filecoin):</p>
-                          
-                          {/* Confidence Level */}
-                          <div>
-                            <label className="text-sm font-medium">Confidence Level (1-10)</label>
-                            <input
-                              type="range"
-                              min="1"
-                              max="10"
-                              value={voteConfidence[coin.id] || 5}
-                              onChange={(e) => setVoteConfidence(prev => ({
-                                ...prev,
-                                [coin.id]: parseInt(e.target.value)
-                              }))}
-                              className="w-full"
-                            />
-                            <div className="flex justify-between text-xs text-gray-500">
-                              <span>1 (Low)</span>
-                              <span>{voteConfidence[coin.id] || 5}</span>
-                              <span>10 (High)</span>
-                            </div>
-                          </div>
-
-                          {/* Reasoning */}
-                          <div>
-                            <label className="text-sm font-medium">Reasoning (optional)</label>
-                            <Input
-                              placeholder="Why are you voting this way?"
-                              value={voteReasoning[coin.id] || ''}
-                              onChange={(e) => setVoteReasoning(prev => ({
-                                ...prev,
-                                [coin.id]: e.target.value
-                              }))}
-                              className="text-sm"
-                            />
-                          </div>
-
-                          {/* Vote Buttons */}
-                          <div className="grid grid-cols-3 gap-2">
-                            <Button
-                              onClick={() => castVote(coin.id, 'safe')}
-                              disabled={isVotingThis || !isConnected || !isCalibnet}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              size="sm"
-                            >
-                              {isVotingThis ? 'Voting...' : '🐂 Safe'}
-                            </Button>
-                            <Button
-                              onClick={() => castVote(coin.id, 'rug')}
-                              disabled={isVotingThis || !isConnected || !isCalibnet}
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                              size="sm"
-                            >
-                              {isVotingThis ? 'Voting...' : '🐻 Rug'}
-                            </Button>
-                            <Button
-                              onClick={() => castVote(coin.id, 'neutral')}
-                              disabled={isVotingThis || !isConnected || !isCalibnet}
-                              variant="outline"
-                              size="sm"
-                            >
-                              {isVotingThis ? 'Voting...' : '🎯 Neutral'}
-                            </Button>
+                      <div className="space-y-3">
+                        <p className="text-sm text-gray-600">Cast your vote (pending until submitted):</p>
+                        
+                        {/* Confidence Level */}
+                        <div>
+                          <label className="text-sm font-medium">Confidence Level (1-10)</label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={voteConfidence[coin.id] || 5}
+                            onChange={(e) => setVoteConfidence(prev => ({
+                              ...prev,
+                              [coin.id]: parseInt(e.target.value)
+                            }))}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span>1 (Low)</span>
+                            <span>{voteConfidence[coin.id] || 5}</span>
+                            <span>10 (High)</span>
                           </div>
                         </div>
-                      ) : (
-                        <Alert>
-                          <CheckCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            You voted <strong>{userVote.vote.toUpperCase()}</strong> with confidence {userVote.confidence}/10.
-                            Your vote is permanently stored on Filecoin.
-                          </AlertDescription>
-                        </Alert>
-                      )}
+
+                        {/* Reasoning */}
+                        <div>
+                          <label className="text-sm font-medium">Reasoning (optional)</label>
+                          <Input
+                            placeholder="Why are you voting this way?"
+                            value={voteReasoning[coin.id] || ''}
+                            onChange={(e) => setVoteReasoning(prev => ({
+                              ...prev,
+                              [coin.id]: e.target.value
+                            }))}
+                            className="text-sm"
+                          />
+                        </div>
+
+                        {/* Vote Buttons */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <Button
+                            onClick={() => castVote(coin.id, 'safe')}
+                            disabled={isVotingThis || !isConnected || !isCalibnet}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            size="sm"
+                          >
+                            {isVotingThis ? 'Voting...' : '🐂 Safe'}
+                          </Button>
+                          <Button
+                            onClick={() => castVote(coin.id, 'rug')}
+                            disabled={isVotingThis || !isConnected || !isCalibnet}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            size="sm"
+                          >
+                            {isVotingThis ? 'Voting...' : '🐻 Rug'}
+                          </Button>
+                          <Button
+                            onClick={() => castVote(coin.id, 'neutral')}
+                            disabled={isVotingThis || !isConnected || !isCalibnet}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {isVotingThis ? 'Voting...' : '🎯 Neutral'}
+                          </Button>
+                        </div>
+                        {isPending && (
+                          <div className="text-xs text-purple-600 mt-2">Vote pending. Go to <b>My Votes</b> to submit.</div>
+                        )}
+                      </div>
 
                       {/* Filecoin Storage Info */}
                       <div className="flex items-center justify-between pt-3 border-t">
@@ -549,9 +499,9 @@ const MemecoinVoting: React.FC = () => {
                           <Database className="h-4 w-4 text-gray-500" />
                           <span className="text-sm text-gray-500">Stored on Filecoin</span>
                         </div>
-                        {userVote?.cid && (
+                        {userVotes[coin.id]?.cid && (
                           <Badge variant="secondary" className="text-xs">
-                            CID: {userVote.cid.slice(0, 10)}...
+                            CID: {userVotes[coin.id].cid.slice(0, 10)}...
                           </Badge>
                         )}
                       </div>

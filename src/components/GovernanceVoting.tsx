@@ -152,6 +152,23 @@ const GovernanceVoting = () => {
     }
   };
 
+  // Helper to manage pending votes in localStorage
+  const PENDING_VOTES_KEY = 'pendingVotes';
+  function getPendingVotes() {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_VOTES_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  }
+  function savePendingVote(voteObj: any) {
+    const votes = getPendingVotes();
+    // Remove any existing vote for this proposal by this user
+    const filtered = votes.filter((v: any) => v.proposalId !== voteObj.proposalId || v.userAddress !== voteObj.userAddress);
+    filtered.push(voteObj);
+    localStorage.setItem(PENDING_VOTES_KEY, JSON.stringify(filtered));
+  }
+
   // Modified handleVote
   const handleVote = async (proposalId: string, vote: 'rug' | 'no-rug') => {
     if (!isConnected) {
@@ -162,7 +179,6 @@ const GovernanceVoting = () => {
       });
       return;
     }
-
     if (!isCalibnet) {
       toast({
         title: "Wrong Network",
@@ -172,7 +188,6 @@ const GovernanceVoting = () => {
       await switchToCalibnet();
       return;
     }
-
     if (!hasEnoughBalance()) {
       toast({
         title: "Insufficient Balance",
@@ -181,7 +196,6 @@ const GovernanceVoting = () => {
       });
       return;
     }
-
     if (userVotes[proposalId]) {
       toast({
         title: "Already Voted",
@@ -190,33 +204,23 @@ const GovernanceVoting = () => {
       });
       return;
     }
-
     setIsVoting(prev => ({ ...prev, [proposalId]: true }));
     setSelectedVote(`${proposalId}-${vote}`);
     try {
-      const result = await voteOnChain(provider as any, proposalId, vote === 'no-rug');
-      if (result.success) {
-        toast({
-          title: 'Vote Submitted Successfully',
-          description: `Transaction: ${result.txHash?.slice(0, 10)}...`,
-        });
-        setUserVotes(prev => ({ ...prev, [proposalId]: true }));
-        setShowUploader(prev => ({ ...prev, [proposalId]: true }));
-        // Upload vote receipt after voting
-        const proposal = proposals.find((p) => p.id === proposalId);
-        if (proposal) await uploadVoteReceipt(proposal, vote);
-        // ... refresh vote counts ...
-        const newVoteCount = await getVoteCount(provider as any, proposalId);
-        if (newVoteCount) {
-          setOnChainVoteCounts(prev => ({ ...prev, [proposalId]: newVoteCount }));
-        }
-      } else {
-        toast({ title: 'Vote Failed', description: result.error || 'Transaction failed', variant: 'destructive' });
-        setSelectedVote(null);
-      }
+      // Save to pending votes instead of submitting
+      savePendingVote({
+        proposalId,
+        vote,
+        userAddress: address,
+        timestamp: Date.now(),
+      });
+      toast({
+        title: 'Vote Saved',
+        description: 'Your vote has been saved to My Votes. Submit it from the My Votes page.',
+      });
     } catch (error) {
       console.error('Vote error:', error);
-      toast({ title: 'Vote Error', description: 'Failed to submit vote. Please try again.', variant: 'destructive' });
+      toast({ title: 'Vote Error', description: 'Failed to save vote. Please try again.', variant: 'destructive' });
       setSelectedVote(null);
     } finally {
       setIsVoting(prev => ({ ...prev, [proposalId]: false }));

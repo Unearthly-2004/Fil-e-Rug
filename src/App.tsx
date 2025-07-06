@@ -13,6 +13,8 @@ import SynapseStorageManager from '@/components/SynapseStorageManager';
 import SynapseFileUploader from '@/components/SynapseFileUploader';
 import NotFound from '@/pages/NotFound';
 import Index from '@/pages/Index';
+import MyVotes from './pages/MyVotes';
+import Chatbot from './pages/Chatbot';
 
 function App() {
   return (
@@ -26,6 +28,8 @@ function App() {
           <Route path="/filecoin-demo" element={<FilecoinDemo />} />
           <Route path="/synapse-storage" element={<SynapseStorageManager />} />
           <Route path="/synapse-upload" element={<SynapseFileUploader />} />
+          <Route path="/chatbot" element={<Chatbot />} />
+          <Route path="/my-votes" element={<MyVotes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Toaster />
