@@ -41,7 +41,7 @@ export interface LighthouseConfig {
 
 // Default configuration - you can override this
 const DEFAULT_CONFIG: LighthouseConfig = {
-  apiKey: "1823d581.cba13cbac3634e0091c86a655fc073f8", // Your provided API key
+  apiKey: import.meta.env.VITE_LIGHTHOUSE_API_KEY, // Your provided API key
   name: "fil-e-rug-storage"
 };
 
