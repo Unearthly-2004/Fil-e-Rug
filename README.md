@@ -1,6 +1,6 @@
 # Fil-e-Rug Platform
 
-A comprehensive decentralized platform for memecoin analysis, voting, and permanent storage on Filecoin.
+A comprehensive decentralized platform for memecoin analysis, voting, and permanent storage on Filecoin. Where one can vote anonymously and get status of the coins/ spam coins.
 
 ## Features
 
@@ -81,3 +81,5 @@ src/
 ## License
 
 This project is licensed under the MIT License.
+
+
